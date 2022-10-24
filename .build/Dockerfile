@@ -7,7 +7,8 @@
 
 # Use NVIDIA CUDA as base image and run the same installation as in the other packages.
 # The version of cudatoolkit must match those of the base image, see Dockerfile.pytorch
-FROM nvidia/cuda:11.6.2-cudnn8-runtime-ubuntu20.04
+#FROM nvidia/cuda:11.6.2-cudnn8-runtime-ubuntu20.04
+FROM nvidia/cuda:11.7.0-cudnn8-runtime-ubuntu20.04
 LABEL authors="Christoph Schranz <christoph.schranz@salzburgresearch.at>, Mathematical Michael <consistentbayes@gmail.com>"
 # This is a concatenated Dockerfile, the maintainers of subsequent sections may vary.
 RUN chmod 1777 /tmp && chmod 1777 /var/tmp
@@ -20,8 +21,8 @@ RUN chmod 1777 /tmp && chmod 1777 /var/tmp
 # Distributed under the terms of the Modified BSD License.
 
 # Ubuntu 20.04 (focal)
-# https://hub.docker.com/_/ubuntu/?tab=tags&name=focal
-ARG ROOT_CONTAINER=ubuntu:focal
+# https://hub.docker.com/_/ubuntu/tags?page=1&name=focal
+ARG ROOT_CONTAINER=ubuntu:20.04
 
 
 LABEL maintainer="Jupyter Project <jupyter@googlegroups.com>"
@@ -49,7 +50,7 @@ RUN apt-get update --yes && \
     fonts-liberation \
     locales \
     # - pandoc is used to convert notebooks to html files
-    #   it's not present in arm64 ubuntu image, so we install it here
+    #   it's not present in aarch64 ubuntu image, so we install it here
     pandoc \
     # - run-one - a wrapper script that runs no more
     #   than one unique  instance  of  some  command with a unique set of arguments,
@@ -210,8 +211,6 @@ RUN apt-get update --yes && \
     tzdata \
     unzip \
     vim-tiny \
-    # Inkscape is installed to be able to convert SVG files
-    inkscape \
     # git-over-ssh
     openssh-client \
     # less is needed to run help in R
@@ -221,7 +220,9 @@ RUN apt-get update --yes && \
     # https://nbconvert.readthedocs.io/en/latest/install.html#installing-tex
     texlive-xetex \
     texlive-fonts-recommended \
-    texlive-plain-generic && \
+    texlive-plain-generic \
+    # Enable clipboard on Linux host systems
+    xclip && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create alternative for nano -> nano-tiny
@@ -229,6 +230,9 @@ RUN update-alternatives --install /usr/bin/nano nano /bin/nano-tiny 10
 
 # Switch back to jovyan to avoid accidental container runs as root
 USER ${NB_UID}
+
+# Add R mimetype option to specify how the plot returns from R to the browser
+COPY --chown=${NB_UID}:${NB_GID} docker-stacks/minimal-notebook/Rprofile.site /opt/conda/lib/R/etc/
 
 ############################################################################
 ################# Dependency: jupyter/scipy-notebook #######################
@@ -335,7 +339,7 @@ RUN conda install --quiet --yes \
 # Check compatibility here:
 # https://pytorch.org/get-started/locally/
 # Installation via conda leads to errors installing cudatoolkit=11.1
-RUN pip install --no-cache-dir torch torchvision torchaudio torchviz --extra-index-url https://download.pytorch.org/whl/cu116
+RUN pip install --no-cache-dir torch torchvision torchaudio torchviz --extra-index-url https://download.pytorch.org/whl/cu117
 
 USER root
 
@@ -377,20 +381,22 @@ RUN set -ex \
 # Install various extensions
 RUN fix-permissions $CONDA_DIR
 
-# RUN jupyter labextension install @jupyterlab/github
-# RUN pip install jupyterlab-git
-RUN pip install jupyterlab-drawio
-RUN jupyter nbextension enable --py --sys-prefix ipyleaflet
-RUN jupyter labextension install jupyterlab-plotly
-RUN jupyter labextension install @jupyter-widgets/jupyterlab-manager plotlywidget
+RUN pip install --no-cache-dir jupyterlab-drawio && \
+    pip install --no-cache-dir jupyter_contrib_nbextensions && \
+    pip install --no-cache-dir jupyter_nbextensions_configurator rise && \
+    pip install --no-cache-dir jupyterlab-language-pack-zh-CN
+
+RUN jupyter nbextension enable --py --sys-prefix ipyleaflet && \
+    jupyter labextension install jupyterlab-plotly && \
+    jupyter labextension install @jupyter-widgets/jupyterlab-manager plotlywidget && \
+    jupyter labextension install @ijmbarr/jupyterlab_spellchecker
+
 # RUN pip install --no-cache-dir jupyter-tabnine  --user && \
 #   jupyter nbextension install --py jupyter_tabnine --user && \
 #   jupyter nbextension enable --py jupyter_tabnine --user && \
 #   jupyter serverextension enable --py jupyter_tabnine --user
-RUN pip install --no-cache-dir jupyter_contrib_nbextensions \
-  jupyter_nbextensions_configurator rise
-#  jupyter nbextension enable codefolding/main
-RUN jupyter labextension install @ijmbarr/jupyterlab_spellchecker
+
+
 
 RUN fix-permissions /home/$NB_USER
 

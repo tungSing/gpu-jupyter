@@ -5,7 +5,7 @@ cd $(cd -P -- "$(dirname -- "$0")" && pwd -P)
 export DOCKERFILE=".build/Dockerfile"
 export STACKS_DIR=".build/docker-stacks"
 # please test the build of the commit in https://github.com/jupyter/docker-stacks/commits/master in advance
-export HEAD_COMMIT="efa95c2c5b9b095247cd2f5e55bc3b38c85da335"
+export HEAD_COMMIT="f3079808ca8cf7a0520a0845fb954e1866913942"
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   -p|--pw|--password) PASSWORD="$2" && USE_PASSWORD=1; shift;;
@@ -146,6 +146,14 @@ cp src/jupyter_notebook_config.json .build/
 echo >> $DOCKERFILE
 echo "# Copy jupyter_notebook_config.json" >> $DOCKERFILE
 echo "COPY jupyter_notebook_config.json /etc/jupyter/"  >> $DOCKERFILE
+
+# configure Chinese mirror source
+cat src/initial-condarc >> .build/initial-condarc
+echo "add Chinese mirror source to initial-condarc"
+
+# fix minimal-notebook/Rprofile.site not found 
+sed -i 's#Rprofile.site#docker-stacks/minimal-notebook/Rprofile.site#g' $DOCKERFILE
+echo "fix minimal-notebook/Rprofile.site not found"
 
 # Set environment variables
 export JUPYTER_UID=$(id -u)
